@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>スマホ ポン出し Pad</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      user-select: none;
+      -webkit-user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+    html, body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      padding: 0;
+      background-color: #f2f2f7;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+    .container {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      padding: 10px;
+      gap: 8px;
+    }
+    /* カテゴリ管理バー */
+    .tabs-header {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-shrink: 0;
+    }
+    .tabs-bar {
+      display: flex;
+      gap: 4px;
+      overflow-x: auto;
+      flex: 1;
+      padding: 2px 0;
+      scrollbar-width: none;
+    }
+    .tabs-bar::-webkit-scrollbar {
+      display: none;
+    }
+    .tab-btn {
+      padding: 8px 12px;
+      font-size: 0.8rem;
+      font-weight: bold;
+      background-color: #e5e5ea;
+      color: #8e8e93;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    .tab-btn.active {
+      background-color: #007aff;
+      color: #ffffff;
+    }
+    .icon-btn {
+      padding: 8px 12px;
+      font-size: 0.8rem;
+      background-color: #e5e5ea;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+    .icon-btn:active {
+      background-color: #d1d1d6;
+    }
+    /* 3x3 グリッド */
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      grid-template-rows: repeat(3, 1fr);
+      gap: 8px;
+      flex: 1;
+      min-height: 0;
+    }
+    .card {
+      background: #ffffff;
+      border: 1px solid #d1d1d6;
+      border-radius: 10px;
+      padding: 6px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      overflow: hidden;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    }
+    .play-btn {
+      width: 100%;
+      flex: 1;
+      border: none;
+      background-color: #e5f1ff;
+      color: #007aff;
+      font-weight: bold;
+      font-size: 0.85rem;
+      border-radius: 6px;
+      cursor: pointer;
+      word-break: break-all;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 2px;
+      line-height: 1.2;
+    }
+    .play-btn:active {
+      background-color: #c0dcb8;
+    }
+    .play-btn.playing {
+      background-color: #34c759;
+      color: #ffffff;
+    }
+    .controls {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      margin-top: 4px;
+    }
+    .controls label {
+      font-size: 0.65rem;
+      color: #8e8e93;
+    }
+    .controls input[type="range"] {
+      width: 100%;
+      height: 16px;
+      margin: 0;
+    }
+    .file-input-wrapper {
+      position: relative;
+      width: 100%;
+      margin-top: 4px;
+    }
+    .file-btn-label {
+      display: block;
+      width: 100%;
+      padding: 4px 0;
+      background-color: #eef0f2;
+      color: #636366;
+      font-size: 0.65rem;
+      text-align: center;
+      border-radius: 4px;
+      cursor: pointer;
+      overflow: hidden;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+    }
+    .file-input {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      opacity: 0;
+      cursor: pointer;
+    }
+    /* 全停止ボタン */
+    .stop-btn {
+      width: 100%;
+      height: 52px;
+      background-color: #ff3b30;
+      color: white;
+      font-size: 1.05rem;
+      font-weight: bold;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      box-shadow: 0 2px 5px rgba(255,59,48,0.3);
+      flex-shrink: 0;
+    }
+    .stop-btn:active {
+      background-color: #d70015;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <!-- カテゴリタブ＆操作エリア -->
+    <div class="tabs-header">
+      <div class="tabs-bar" id="tabsBar"></div>
+      <button class="icon-btn" onclick="addCategory()" title="カテゴリ追加">＋</button>
+      <button class="icon-btn" onclick="renameCategory()" title="名前変更">✏️</button>
+      <button class="icon-btn" onclick="deleteCategory()" title="カテゴリ削除">🗑️</button>
+    </div>
+
+    <!-- 3x3 グリッド -->
+    <div class="grid" id="padGrid"></div>
+
+    <!-- 全停止ボタン -->
+    <button class="stop-btn" onclick="stopAll()">⏹️ 全停止 (STOP ALL)</button>
+  </div>
+
+  <script>
+    const padGrid = document.getElementById('padGrid');
+    const tabsBar = document.getElementById('tabsBar');
+    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    
+    let currentCategoryIndex = 0;
+
+    let categories = [
+      { name: "効果音", pads: createEmptyPads() },
+      { name: "BGM", pads: createEmptyPads() }
+    ];
+
+    function createEmptyPads() {
+      return Array.from({ length: 9 }, () => ({
+        audioBuffer: null,
+        currentSource: null,
+        volume: 1.0,
+        fileName: ''
+      }));
+    }
+
+    for (let i = 0; i < 9; i++) {
+      const padEl = document.createElement('div');
+      padEl.className = 'card';
+      padEl.innerHTML = `
+        <button class="play-btn" id="btn-${i}" onclick="playPad(${i})">
+          <div>[${i + 1}]</div>
+          <div style="font-size:0.7rem; font-weight:normal; margin-top:2px;" id="name-${i}">未設定</div>
+        </button>
+        <div class="controls">
+          <label>Vol</label>
+          <input type="range" id="vol-${i}" min="0" max="1" step="0.05" value="1" oninput="updateVolume(${i})">
+        </div>
+        <div class="file-input-wrapper">
+          <span class="file-btn-label" id="label-${i}">音源選択</span>
+          <!-- ここを修正：accept属性をiPhone対応に最適化 -->
+          <input type="file" class="file-input" accept=".mp3,audio/mpeg" onchange="loadAudio(event, ${i})">
+        </div>
+      `;
+      padGrid.appendChild(padEl);
+    }
+
+    function renderTabs() {
+      tabsBar.innerHTML = '';
+      categories.forEach((cat, idx) => {
+        const btn = document.createElement('button');
+        btn.className = `tab-btn ${idx === currentCategoryIndex ? 'active' : ''}`;
+        btn.innerText = cat.name;
+        btn.onclick = () => switchCategory(idx);
+        tabsBar.appendChild(btn);
+      });
+    }
+
+    function switchCategory(index) {
+      currentCategoryIndex = index;
+      renderTabs();
+      updateGridDisplay();
+    }
+
+    function updateGridDisplay() {
+      const currentPads = categories[currentCategoryIndex].pads;
+      for (let i = 0; i < 9; i++) {
+        const pad = currentPads[i];
+        document.getElementById(`name-${i}`).innerText = pad.fileName || "未設定";
+        document.getElementById(`label-${i}`).innerText = pad.fileName ? "変更" : "音源選択";
+        document.getElementById(`vol-${i}`).value = pad.volume;
+        
+        const btn = document.getElementById(`btn-${i}`);
+        if (pad.currentSource) {
+          btn.classList.add('playing');
+        } else {
+          btn.classList.remove('playing');
+        }
+      }
+    }
+
+    function addCategory() {
+      const name = prompt("新しいカテゴリ名を入力してください:", `カテゴリ${categories.length + 1}`);
+      if (!name) return;
+      
+      categories.push({
+        name: name,
+        pads: createEmptyPads()
+      });
+      switchCategory(categories.length - 1);
+    }
+
+    function renameCategory() {
+      const currentCat = categories[currentCategoryIndex];
+      const newName = prompt("カテゴリ名を入力してください:", currentCat.name);
+      if (newName) {
+        currentCat.name = newName;
+        renderTabs();
+      }
+    }
+
+    function deleteCategory() {
+      if (categories.length <= 1) {
+        alert("これ以上カテゴリを削除できません。");
+        return;
+      }
+      if (!confirm(`「${categories[currentCategoryIndex].name}」を削除しますか？`)) return;
+
+      categories[currentCategoryIndex].pads.forEach(pad => {
+        if (pad.currentSource) {
+          try { pad.currentSource.stop(); } catch(e) {}
+        }
+      });
+
+      categories.splice(currentCategoryIndex, 1);
+      if (currentCategoryIndex >= categories.length) {
+        currentCategoryIndex = categories.length - 1;
+      }
+      switchCategory(currentCategoryIndex);
+    }
+
+    function loadAudio(event, index) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const pad = categories[currentCategoryIndex].pads[index];
+      const reader = new FileReader();
+
+      reader.onload = function(e) {
+        audioContext.decodeAudioData(e.target.result, function(buffer) {
+          pad.audioBuffer = buffer;
+          pad.fileName = file.name;
+          document.getElementById(`name-${index}`).innerText = file.name;
+          document.getElementById(`label-${index}`).innerText = "変更";
+        });
+      };
+      reader.readAsArrayBuffer(file);
+    }
+
+    function playPad(index) {
+      if (audioContext.state === 'suspended') {
+        audioContext.resume();
+      }
+
+      const pad = categories[currentCategoryIndex].pads[index];
+      if (!pad.audioBuffer) return;
+
+      if (pad.currentSource) {
+        try { pad.currentSource.stop(); } catch(e) {}
+      }
+
+      const source = audioContext.createBufferSource();
+      source.buffer = pad.audioBuffer;
+
+      const gainNode = audioContext.createGain();
+      gainNode.gain.value = pad.volume;
+
+      source.connect(gainNode);
+      gainNode.connect(audioContext.destination);
+
+      source.start(0);
+      pad.currentSource = source;
+
+      const btn = document.getElementById(`btn-${index}`);
+      btn.classList.add('playing');
+
+      source.onended = () => {
+        pad.currentSource = null;
+        btn.classList.remove('playing');
+      };
+    }
+
+    function updateVolume(index) {
+      const volVal = parseFloat(document.getElementById(`vol-${index}`).value);
+      categories[currentCategoryIndex].pads[index].volume = volVal;
+    }
+
+    function stopAll() {
+      categories.forEach(cat => {
+        cat.pads.forEach(pad => {
+          if (pad.currentSource) {
+            try { pad.currentSource.stop(); } catch(e) {}
+            pad.currentSource = null;
+          }
+        });
+      });
+      for (let i = 0; i < 9; i++) {
+        document.getElementById(`btn-${i}`).classList.remove('playing');
+      }
+    }
+
+    renderTabs();
+    updateGridDisplay();
+  </script>
+</body>
+</html>

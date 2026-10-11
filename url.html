@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>Mini Netlify - アップロード</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: #f7f9fa;
+            color: #333;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+        .container {
+            background: #fff;
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+            width: 400px;
+            text-align: center;
+        }
+        h2 { margin-top: 0; color: #00c7b7; }
+        
+        /* ドロップゾーン */
+        #drop-zone {
+            border: 2px dashed #cbd5e1;
+            border-radius: 8px;
+            padding: 40px 20px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            background: #fafafa;
+        }
+        #drop-zone.dragover {
+            border-color: #00c7b7;
+            background: #e6fffe;
+        }
+        #file-input { display: none; }
+        
+        /* プログレスバー関連のスタイル */
+        #progress-container {
+            display: none;
+            margin-top: 20px;
+            text-align: left;
+        }
+        .progress-bar-bg {
+            width: 100%;
+            background-color: #e2e8f0;
+            border-radius: 4px;
+            overflow: hidden;
+            height: 8px;
+            margin-top: 8px;
+        }
+        #progress-bar {
+            width: 0%;
+            height: 100%;
+            background-color: #00c7b7;
+            transition: width 0.1s ease;
+        }
+        #progress-text {
+            font-size: 13px;
+            color: #64748b;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        /* 結果表示 */
+        #status { margin-top: 20px; font-size: 14px; color: #666; }
+        .result-box {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f0fdf4;
+            border: 1px solid #bbf7d0;
+            border-radius: 6px;
+            word-break: break-all;
+        }
+        .result-box a { color: #16a34a; font-weight: bold; text-decoration: none; }
+        .result-box a:hover { text-decoration: underline; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>Mini Netlify</h2>
+    <p>WebサイトのZIPファイルをドロップしてください</p>
+    
+    <div id="drop-zone">
+        <span id="drop-text">ここにZIPファイルを<br>ドラッグ＆ドロップ<br><br><small style="color: #888;">またはクリックして選択</small></span>
+        <input type="file" id="file-input" accept=".zip">
+    </div>
+
+    <!-- プログレスバー -->
+    <div id="progress-container">
+        <div id="progress-text">
+            <span id="progress-label">アップロード中...</span>
+            <span id="progress-percent">0%</span>
+        </div>
+        <div class="progress-bar-bg">
+            <div id="progress-bar"></div>
+        </div>
+    </div>
+
+    <div id="status"></div>
+    <div id="result" style="display: none;"></div>
+</div>
+
+<script>
+    const dropZone = document.getElementById('drop-zone');
+    const fileInput = document.getElementById('file-input');
+    const dropText = document.getElementById('drop-text');
+    const statusDiv = document.getElementById('status');
+    const resultDiv = document.getElementById('result');
+    const progressContainer = document.getElementById('progress-container');
+    const progressBar = document.getElementById('progress-bar');
+    const progressPercent = document.getElementById('progress-percent');
+    const progressLabel = document.getElementById('progress-label');
+
+    // ドラッグ＆ドロップの基本イベント
+    ['dragenter', 'dragover'].forEach(eventName => {
+        dropZone.addEventListener(eventName, (e) => {
+            e.preventDefault();
+            dropZone.classList.add('dragover');
+        }, false);
+    });
+
+    ['dragleave', 'drop'].forEach(eventName => {
+        dropZone.addEventListener(eventName, (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('dragover');
+        }, false);
+    });
+
+    dropZone.addEventListener('drop', (e) => {
+        const files = e.dataTransfer.files;
+        if (files.length > 0) handleFile(files[0]);
+    });
+
+    dropZone.addEventListener('click', () => fileInput.click());
+    fileInput.addEventListener('change', (e) => {
+        if (e.target.files.length > 0) handleFile(e.target.files[0]);
+    });
+
+    // ファイルアップロード処理（XMLHttpRequestを使用）
+    function handleFile(file) {
+        if (!file.name.endsWith('.zip')) {
+            alert('ZIPファイルを選択してください。');
+            return;
+        }
+
+        dropText.innerText = `選択中: ${file.name}`;
+        statusDiv.innerText = '';
+        resultDiv.style.display = 'none';
+        
+        // プログレスバーを表示してリセット
+        progressContainer.style.display = 'block';
+        progressBar.style.width = '0%';
+        progressPercent.innerText = '0%';
+        progressLabel.innerText = 'アップロード中...';
+
+        const formData = new FormData();
+        formData.append('file', file);
+
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', '/upload', true);
+
+        // アップロード中の進捗イベント
+        xhr.upload.onprogress = function(e) {
+            if (e.lengthComputable) {
+                const percentComplete = Math.round((e.loaded / e.total) * 100);
+                progressBar.style.width = percentComplete + '%';
+                progressPercent.innerText = percentComplete + '%';
+                
+                if (percentComplete === 100) {
+                    progressLabel.innerText = 'サーバーで展開中...';
+                }
+            }
+        };
+
+        // 通信完了時の処理
+        xhr.onload = function() {
+            progressContainer.style.display = 'none';
+
+            if (xhr.status === 200) {
+                const data = JSON.parse(xhr.responseText);
+                statusDiv.innerText = '公開成功！';
+                
+                const fullUrl = window.location.origin + data.url;
+                resultDiv.style.display = 'block';
+                resultDiv.innerHTML = `
+                    <div class="result-box">
+                        <p style="margin:0 0 8px 0; font-size:13px; color:#166534;">デプロイが完了しました 🎉</p>
+                        <a href="${fullUrl}" target="_blank">${fullUrl}</a>
+                    </div>
+                `;
+            } else {
+                try {
+                    const err = JSON.parse(xhr.responseText);
+                    alert(err.detail || 'アップロードに失敗しました。');
+                } catch {
+                    alert('アップロードに失敗しました。');
+                }
+                resetUI();
+            }
+        };
+
+        // 通信エラー時の処理
+        xhr.onerror = function() {
+            progressContainer.style.display = 'none';
+            alert('ネットワークエラーが発生しました。');
+            resetUI();
+        };
+
+        xhr.send(formData);
+    }
+
+    function resetUI() {
+        dropText.innerHTML = `ここにZIPファイルを<br>ドラッグ＆ドロップ<br><br><small style="color: #888;">またはクリックして選択</small>`;
+    }
+</script>
+
+</body>
+</html>
